@@ -1,3 +1,9 @@
 .ipynb_checkpoints
 *.csv
 *.xls
+
+# TensorFlow Protobuffer files
+*.pb
+
+# TF models dirs
+model_*
