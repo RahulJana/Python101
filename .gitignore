@@ -10,3 +10,4 @@
 
 # TF models dirs
 model_*
+*.npz
