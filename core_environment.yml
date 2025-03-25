@@ -1,0 +1,54 @@
+name: chiron-env
+dependencies:
+  - python=3.10
+  - lark
+  - pandas
+  - pandoc
+  - numpy<1.24
+  - scikit-learn=1.3.2
+  - pyarrow
+  - boto3
+  - tensorflow-probability==0.24.0
+  - pydantic==1.10.17
+
+  - conda-forge::openmm=8.0
+  - conda-forge::openfe=1.1.0
+  - conda-forge::pdbfixer
+  - conda-forge::vina
+
+  - pytorch::cpuonly
+  - pytorch::pytorch
+
+  - pyg::pyg # Pytorch-Geometric
+
+  - dglteam::dgl=1.1.3
+
+  - pip
+  - pip:
+      - rdkit
+      - mdtraj
+      - dgllife
+      - tensorflow==2.16.1
+      - transformers
+      - Pillow
+      - MDAnalysis
+      - plotly
+      # This is intended. --pre on the same line as deepchem will NOT work.
+      - --pre
+      - deepchem
+      - rdchiral
+      - Bio
+      - onnxruntime
+      - route-distances
+      - mpmath==1.3.0 # to be removed once a patch is issued by mpmath
+      - swifter==1.4.0
+      - networkx==3.1.0
+      # The following are dependencies required for covalent docking
+      - prody
+      - meeko==0.5.1
+      - pyparsing==3.0.9
+      - git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
+      - reaction-utils
+      - rxnmapper
+      - metaflow
+      - mendeleev
