@@ -1,0 +1,10 @@
+2025-03-21 21:32:10,910:INFO:Created Employee: John Doe - john.doe@company.com
+2025-03-21 21:32:10,911:INFO:Created Employee: Jane Doe - jane.doe@company.com
+2025-03-21 21:32:42,980:INFO:Created Employee: John Doe - john.doe@company.com 
+2025-03-21 21:32:42,980:INFO:Created Employee: Jane Doe - jane.doe@company.com 
+2025-03-21 21:32:59,941:INFO:Created Employee: John Doe - john.doe@company.com 
+2025-03-21 21:32:59,941:INFO:Created Employee: Jane Doe - jane.doe@company.com 
+2025-03-21 21:45:03,123:root:INFO:Created Employee: John Doe - john.doe@company.com 
+2025-03-21 21:45:03,124:root:INFO:Created Employee: Jane Doe - jane.doe@company.com 
+2025-03-21 22:08:42,249:root:INFO:Created Employee: Rahul Jana - rahul.jana@company.com 
+2025-03-21 22:08:42,249:root:INFO:Created Employee: Sosuke Aizen - sosuke.aizen@company.com 
