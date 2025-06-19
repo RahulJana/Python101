@@ -5,3 +5,4 @@ seaborn
 plotly
 tqdm
 scikit-learn
+ipykernel

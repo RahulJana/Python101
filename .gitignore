@@ -11,3 +11,7 @@
 # TF models dirs
 model_*
 *.npz
+runs/
+*.pt
+*.mp4
+data/
