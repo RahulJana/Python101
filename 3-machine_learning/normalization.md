@@ -1,6 +1,16 @@
 # Normalization
 
+## References:
 1. Ref 1: https://www.youtube.com/watch?v=bqhQ2LWBheQ
+2. Ref 2: https://www.youtube.com/watch?v=sxEqtjLC0aM
+
+
+## What is Feature Scaling?
+
+* A **preprocessing step** in machine learning used to ensure that all features are on a similar scale.
+* Prevents **one feature from dominating** others due to different value ranges.
+* Commonly used before training models like neural networks or regression algorithms.
+
 
 ## Methods of Normalization
 
@@ -103,12 +113,6 @@
 
 
 ## Normalization vs Standardazation
-
-### 🔹 What is Feature Scaling?
-
-* A **preprocessing step** in machine learning used to ensure that all features are on a similar scale.
-* Prevents **one feature from dominating** others due to different value ranges.
-* Commonly used before training models like neural networks or regression algorithms.
 
 ---
 
