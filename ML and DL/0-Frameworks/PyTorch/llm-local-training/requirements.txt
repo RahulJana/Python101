@@ -1,0 +1,10 @@
+transformers
+datasets
+accelerate
+peft
+evaluate
+scikit-learn
+sentencepiece
+safetensors
+jupyter
+ipykernel
