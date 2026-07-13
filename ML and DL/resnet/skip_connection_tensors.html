@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skip connection — in tensors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --panel:#161B22; --panel-2:#1B222C;
+    --ink:#E6E9EF; --dim:#9BA3AF; --muted:#5C6470;
+    --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.14);
+    --skip:#3FB6A8;      /* identity / carried through */
+    --main:#6E8BFF;      /* computed adjustment */
+    --add:#E0A93B;       /* summed / output */
+    --dead:#E5605E;      /* relu clamped to zero */
+    --proj:#E08A5B;      /* projection shortcut */
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --disp:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--disp); line-height:1.6;
+    padding:clamp(20px,5vw,64px) clamp(16px,5vw,48px);
+  }
+  .wrap{max-width:860px;margin:0 auto}
+
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--main);margin:0 0 14px}
+  h1{font-size:clamp(28px,6vw,44px);font-weight:700;letter-spacing:-.02em;line-height:1.08;margin:0 0 14px}
+  h1 em{font-style:normal;color:var(--skip)}
+  .lede{color:var(--dim);font-size:clamp(15px,2.4vw,17px);max-width:60ch;margin:0 0 8px}
+  .eq{font-family:var(--mono);color:var(--add);font-size:15px;margin:18px 0 0}
+  .eq b{color:var(--skip);font-weight:600}
+  .eq i{font-style:normal;color:var(--main)}
+
+  section{margin-top:clamp(40px,7vw,72px)}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .sec-num{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.1em}
+  h2{font-size:clamp(20px,3.4vw,26px);font-weight:500;letter-spacing:-.01em;margin:0}
+  .sec-sub{color:var(--dim);font-size:15px;max-width:62ch;margin:8px 0 24px}
+
+  .panel{background:var(--panel);border:0.5px solid var(--line);border-radius:14px;padding:clamp(18px,3vw,28px)}
+
+  /* element-wise bench */
+  .bench{display:grid;grid-template-columns:96px 1fr;gap:18px 20px;align-items:center}
+  .rowlabel{font-family:var(--mono);font-size:12px;color:var(--dim);text-align:right;letter-spacing:.04em}
+  .rowlabel b{display:block;color:var(--ink);font-size:13px;font-weight:600}
+  .cells{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .cell{background:var(--panel-2);border:0.5px solid var(--line);border-radius:9px;padding:10px 8px;text-align:center;font-family:var(--mono)}
+  .cell .v{font-size:17px;font-weight:600}
+  .cell .ch{font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:5px}
+  .cell.skip .v{color:var(--skip)} .cell.skip{border-color:rgba(63,182,168,.35)}
+  .cell.main .v{color:var(--main)}
+  .cell.out .v{color:var(--add)} .cell.out{border-color:rgba(224,169,59,.35)}
+  .cell.out.dead .v{color:var(--dead)} .cell.out.dead{border-color:rgba(229,96,94,.4)}
+  .cell .op{font-size:10px;color:var(--muted);margin-top:3px;min-height:12px}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--line-2);border-radius:3px;outline:none;margin:9px 0 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--ink);cursor:pointer;border:2px solid var(--bg)}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--ink);cursor:pointer;border:2px solid var(--bg)}
+  .sl-x::-webkit-slider-thumb{background:var(--skip)} .sl-x::-moz-range-thumb{background:var(--skip)}
+  .sl-f::-webkit-slider-thumb{background:var(--main)} .sl-f::-moz-range-thumb{background:var(--main)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  button{font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--ink);background:transparent;border:0.5px solid var(--line-2);border-radius:8px;padding:9px 14px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:var(--panel-2);border-color:var(--line-2)}
+  button:active{transform:scale(.98)}
+  button.accent{border-color:rgba(110,139,255,.5);color:var(--main)}
+
+  .note{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-top:18px;padding-left:12px;border-left:2px solid var(--line-2);line-height:1.7}
+  .note b{color:var(--ink);font-weight:600}
+
+  /* shape bench */
+  .shapewrap{display:grid;gap:16px}
+  .selrow{display:flex;flex-wrap:wrap;gap:18px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field span{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+  select{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--panel-2);border:0.5px solid var(--line-2);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .shapes{display:grid;grid-template-columns:1fr;gap:12px;margin-top:6px}
+  .shapebox{background:var(--panel-2);border:0.5px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+  .shapebox .tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);min-width:118px}
+  .shapebox .tensor{font-family:var(--mono);font-size:16px;font-weight:600}
+  .shapebox.in .tensor{color:var(--skip)}
+  .shapebox.mn .tensor{color:var(--main)}
+  .shapebox.sc .tensor{color:var(--skip)}
+  .shapebox.sc.proj .tensor{color:var(--proj)}
+  .shapebox.res .tensor{color:var(--add)}
+  .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;padding:3px 9px;border-radius:20px}
+  .pill.id{background:rgba(63,182,168,.14);color:var(--skip)}
+  .pill.proj{background:rgba(224,138,91,.16);color:var(--proj)}
+  .verdict{font-family:var(--mono);font-size:13px;line-height:1.7;margin-top:6px;color:var(--dim)}
+  .verdict b{color:var(--ink);font-weight:600}
+
+  footer{margin-top:56px;padding-top:20px;border-top:0.5px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.03em}
+
+  @media (max-width:560px){
+    .bench{grid-template-columns:1fr;gap:8px}
+    .rowlabel{text-align:left}
+    .cells{gap:7px}
+    .cell .v{font-size:15px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Residual networks · the shortcut, concretely</p>
+  <h1>What flows through the <em>skip connection</em>, in tensors</h1>
+  <p class="lede">The shortcut carries the block's input straight to the addition — no weights, no activation, unchanged. The main path only learns an adjustment. Drag the values and watch the arithmetic.</p>
+  <p class="eq">output = relu( <i>F(x)</i> + <b>x</b> )&nbsp;&nbsp;&nbsp;<i>F(x)</i> = main path · <b>x</b> = shortcut</p>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>Element-wise, one small block</h2></div>
+    <p class="sec-sub">A four-channel input (a 1×1 feature map). The shortcut row is a byte-for-byte copy of the input — notice it never changes when you touch the main path.</p>
+
+    <div class="panel">
+      <div class="bench">
+        <div class="rowlabel"><b>x</b>shortcut in</div>
+        <div class="cells" id="xCells"></div>
+
+        <div class="rowlabel"><b>F(x)</b>main path</div>
+        <div class="cells" id="fCells"></div>
+
+        <div class="rowlabel"><b>carries</b>shortcut →</div>
+        <div class="cells" id="sCells"></div>
+
+        <div class="rowlabel"><b>output</b>relu(F+x)</div>
+        <div class="cells" id="oCells"></div>
+      </div>
+
+      <div class="controls">
+        <button class="accent" id="zeroBtn">Set F(x) = 0  (block does nothing)</button>
+        <button id="resetBtn">Reset values</button>
+      </div>
+
+      <p class="note" id="note01"></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Real ResNet-50 shapes</h2></div>
+    <p class="sec-sub">Shape is [batch, channels, height, width]. The shortcut is a raw identity copy only when its shape already matches the main path. Change the channels or stride to force a projection.</p>
+
+    <div class="panel">
+      <div class="shapewrap">
+        <div class="selrow">
+          <label class="field"><span>in channels</span>
+            <select id="cin"><option>64</option><option selected>256</option><option>512</option></select></label>
+          <label class="field"><span>out channels</span>
+            <select id="cout"><option>128</option><option selected>256</option><option>512</option><option>1024</option></select></label>
+          <label class="field"><span>stride</span>
+            <select id="stride"><option selected>1</option><option>2</option></select></label>
+          <label class="field"><span>spatial (H=W)</span>
+            <select id="hw"><option selected>56</option><option>28</option><option>14</option></select></label>
+        </div>
+
+        <div class="shapes">
+          <div class="shapebox in"><span class="tag">input x</span><span class="tensor" id="inShape"></span></div>
+          <div class="shapebox mn"><span class="tag">main path F(x)</span><span class="tensor" id="mnShape"></span></div>
+          <div class="shapebox sc" id="scBox"><span class="tag">shortcut</span><span class="tensor" id="scShape"></span><span class="pill" id="scPill"></span></div>
+          <div class="shapebox res"><span class="tag">F(x) + shortcut</span><span class="tensor" id="resShape"></span></div>
+        </div>
+
+        <p class="verdict" id="verdict"></p>
+      </div>
+    </div>
+  </section>
+
+  <footer id="foot">tensor bench · relu(F(x) + x)</footer>
+</div>
+
+<script>
+const DEF_X = [2.0, -1.0, 3.0, 0.5];
+const DEF_F = [0.3, 0.2, -0.5, 0.1];
+let X = [...DEF_X], F = [...DEF_F];
+
+function fmt(n){ return (n>=0?' ':'') + n.toFixed(1); }
+
+function buildSliders(cells, arr, cls, onInput){
+  cells.innerHTML='';
+  arr.forEach((val,i)=>{
+    const c=document.createElement('div');
+    c.className='cell '+(cls==='sl-x'?'skip':'main');
+    c.innerHTML='<div class="ch">c'+i+'</div><div class="v">'+fmt(val)+'</div>'+
+      '<input type="range" class="'+cls+'" min="-3" max="3" step="0.1" value="'+val+'">';
+    const slider=c.querySelector('input');
+    slider.addEventListener('input',e=>{ onInput(i, parseFloat(e.target.value)); });
+    cells.appendChild(c);
+  });
+}
+
+function renderReadouts(){
+  const sCells=document.getElementById('sCells');
+  const oCells=document.getElementById('oCells');
+  sCells.innerHTML=''; oCells.innerHTML='';
+  let clamps=0;
+  for(let i=0;i<4;i++){
+    const sc=document.createElement('div');
+    sc.className='cell skip';
+    sc.innerHTML='<div class="ch">c'+i+'</div><div class="v">'+fmt(X[i])+'</div><div class="op">= x</div>';
+    sCells.appendChild(sc);
+
+    const sum=F[i]+X[i];
+    const out=Math.max(0,sum);
+    const dead=sum<0;
+    if(dead)clamps++;
+    const oc=document.createElement('div');
+    oc.className='cell out'+(dead?' dead':'');
+    oc.innerHTML='<div class="ch">c'+i+'</div><div class="v">'+fmt(out)+'</div>'+
+      '<div class="op">'+fmt(F[i]).trim()+'+'+fmt(X[i]).trim()+(dead?' ✕':'')+'</div>';
+    oCells.appendChild(oc);
+  }
+  const allZeroF = F.every(v=>Math.abs(v)<1e-9);
+  const note=document.getElementById('note01');
+  if(allZeroF){
+    note.innerHTML='<b>Block does nothing.</b> With F(x) all zeros, output = 0 + x = x. The input passes straight through untouched — which is exactly why stacking a useless block never hurts. Learning "do nothing" just means driving the weights toward zero.';
+  } else if(clamps>0){
+    note.innerHTML='<b>'+clamps+' channel'+(clamps>1?'s':'')+' clamped by relu.</b> Where F(x)+x is negative, the final relu snaps it to 0 (marked ✕). Everywhere else the output is simply the shortcut value nudged by the main path.';
+  } else {
+    note.innerHTML='<b>Output = input, nudged.</b> Each channel is just x plus a small learned adjustment. The shortcut supplied the starting point; the main path only had to supply the difference.';
+  }
+}
+
+function refreshX(){
+  document.querySelectorAll('#xCells .cell').forEach((c,i)=>{ c.querySelector('.v').textContent=fmt(X[i]); });
+}
+function refreshF(){
+  document.querySelectorAll('#fCells .cell').forEach((c,i)=>{ c.querySelector('.v').textContent=fmt(F[i]); });
+}
+
+function initPart1(){
+  buildSliders(document.getElementById('xCells'), X, 'sl-x', (i,v)=>{ X[i]=v; refreshX(); renderReadouts(); });
+  buildSliders(document.getElementById('fCells'), F, 'sl-f', (i,v)=>{ F[i]=v; refreshF(); renderReadouts(); });
+  renderReadouts();
+}
+
+document.getElementById('zeroBtn').addEventListener('click',()=>{
+  F=[0,0,0,0];
+  document.querySelectorAll('#fCells .cell').forEach((c,i)=>{ c.querySelector('.v').textContent=fmt(F[i]); c.querySelector('input').value=0; });
+  renderReadouts();
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  X=[...DEF_X]; F=[...DEF_F];
+  document.querySelectorAll('#xCells .cell').forEach((c,i)=>{ c.querySelector('.v').textContent=fmt(X[i]); c.querySelector('input').value=X[i]; });
+  document.querySelectorAll('#fCells .cell').forEach((c,i)=>{ c.querySelector('.v').textContent=fmt(F[i]); c.querySelector('input').value=F[i]; });
+  renderReadouts();
+});
+
+/* Part 2: shapes */
+function renderShapes(){
+  const cin=+document.getElementById('cin').value;
+  const cout=+document.getElementById('cout').value;
+  const s=+document.getElementById('stride').value;
+  const hw=+document.getElementById('hw').value;
+  const ohw=Math.floor(hw/s);
+
+  const inS='[1, '+cin+', '+hw+', '+hw+']';
+  const mnS='[1, '+cout+', '+ohw+', '+ohw+']';
+  document.getElementById('inShape').textContent=inS;
+  document.getElementById('mnShape').textContent=mnS;
+
+  const identity = (s===1 && cin===cout);
+  const scBox=document.getElementById('scBox');
+  const scPill=document.getElementById('scPill');
+  const verdict=document.getElementById('verdict');
+
+  if(identity){
+    document.getElementById('scShape').textContent=inS+'  (unchanged)';
+    scBox.classList.remove('proj');
+    scPill.className='pill id'; scPill.textContent='identity · 0 params';
+    verdict.innerHTML='<b>Raw copy.</b> Input and main-path shapes already match, so the shortcut carries x exactly as it arrived — no computation, no parameters. This is most blocks in the network.';
+  } else {
+    document.getElementById('scShape').textContent=mnS;
+    scBox.classList.add('proj');
+    scPill.className='pill proj'; scPill.textContent='1×1 conv projection';
+    const reasons=[];
+    if(cin!==cout)reasons.push('channels '+cin+'→'+cout);
+    if(s!==1)reasons.push('downsample '+hw+'→'+ohw+' (stride '+s+')');
+    verdict.innerHTML='<b>Projection needed.</b> The block changes '+reasons.join(' and ')+', so a plain copy '+inS+' can\'t be added to '+mnS+'. A 1×1 stride-'+s+' conv reshapes x to match. This is the one case where the shortcut isn\'t literally raw input.';
+  }
+  document.getElementById('resShape').textContent=mnS;
+}
+['cin','cout','stride','hw'].forEach(id=>document.getElementById(id).addEventListener('change',renderShapes));
+
+initPart1();
+renderShapes();
+</script>
+</body>
+</html>
