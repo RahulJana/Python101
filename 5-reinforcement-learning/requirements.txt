@@ -1,0 +1,31 @@
+# Reinforcement Learning Requirements
+
+# Core Data Science & Visualization
+numpy>=1.21.0
+pandas>=1.3.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+plotly>=5.0.0
+tqdm>=4.62.0
+
+# Machine Learning & Scientific Computing
+scikit-learn>=0.24.0
+scipy>=1.7.0
+
+# Reinforcement Learning Frameworks
+gymnasium>=0.27.0  # Modern replacement for OpenAI Gym
+stable-baselines3>=2.0.0  # Popular RL algorithms
+optuna>=3.0.0  # Hyperparameter optimization
+
+# Deep Learning (often used with RL)
+tensorflow>=2.11.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Jupyter & Development
+ipykernel>=6.0.0
+jupyter>=1.0.0
+ipython>=8.0.0
+
+# Additional Utilities
+pygame>=2.1.0  # For environment visualization
